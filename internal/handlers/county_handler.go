@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"html/template"
 	pb "github.com/pocketbase/pocketbase/models"
 	
 	"github.com/pocketbase/dbx"
@@ -18,6 +19,31 @@ type CountyHandler struct {
 	store   *storage.PocketBaseStore
 	manager *parser.ParserManager
 }
+
+type MeasureGroup struct {
+	Title    string
+	Measures []Measure
+}
+
+type Measure struct {
+	Name        string
+	Description string
+	YesVotes    string
+	NoVotes     string
+}
+
+type Race struct {
+	Title      string
+	Candidates []Candidate
+}
+
+type Candidate struct {
+	Name     string
+	Position string
+	Votes    string
+}
+
+const perPage = 100 // Number of records per page
 
 func NewCountyHandler(store *storage.PocketBaseStore, manager *parser.ParserManager) *CountyHandler {
 	return &CountyHandler{
@@ -427,4 +453,199 @@ func (h *CountyHandler) HandleGetCountyResults(w http.ResponseWriter, r *http.Re
 		"total":   len(results),
 		"results": results,
 	})
+}
+
+func (h *CountyHandler) HandleGetMeasuresHTML(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get county ID from path
+	countyID := r.PathValue("id")
+	if countyID == "" {
+		http.Error(w, "County ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get results from PocketBase
+	collectionName := fmt.Sprintf("county_%s_results", countyID)
+	collection, err := h.store.GetPocketBase().Dao().FindCollectionByNameOrId(collectionName)
+	if err != nil {
+		http.Error(w, "County results not found", http.StatusNotFound)
+		return
+	}
+
+	// Query only measure results
+	query := h.store.GetPocketBase().Dao().RecordQuery(collection).
+		AndWhere(dbx.HashExp{"type": "measure"})
+
+	// Initialize slice to hold all records
+	var allRecords []*pb.Record
+
+	// Get all records with pagination
+	page := 1
+	for {
+		pageRecords := []*pb.Record{}
+		err := query.Offset(int64((page - 1) * perPage)).
+			Limit(int64(perPage)).
+			All(&pageRecords)
+
+		if err != nil {
+			log.Printf("Error fetching page %d: %v", page, err)
+			http.Error(w, "Error fetching results", http.StatusInternalServerError)
+			return
+		}
+
+		// If no records returned, we've reached the end
+		if len(pageRecords) == 0 {
+			break
+		}
+
+		allRecords = append(allRecords, pageRecords...)
+		page++
+	}
+
+	// Group measures by contest (using all records)
+	groupMap := make(map[string]*MeasureGroup)
+	for _, record := range allRecords {
+		contestName := record.GetString("contest_name")
+		if _, exists := groupMap[contestName]; !exists {
+			groupMap[contestName] = &MeasureGroup{
+				Title: contestName,
+			}
+		}
+
+		measure := Measure{
+			Name:        record.GetString("choice_name"),
+			Description: record.GetString("description"),
+			YesVotes:    formatVotes(record.GetInt("yes_votes")),
+			NoVotes:     formatVotes(record.GetInt("no_votes")),
+		}
+		groupMap[contestName].Measures = append(groupMap[contestName].Measures, measure)
+	}
+
+	// Convert map to slice
+	var groups []MeasureGroup
+	for _, group := range groupMap {
+		groups = append(groups, *group)
+	}
+
+	// Parse and execute template
+	tmpl, err := template.ParseFiles("internal/templates/measures.html")
+	if err != nil {
+		log.Printf("Error parsing template: %v", err)
+		http.Error(w, "Error parsing template", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := tmpl.Execute(w, map[string]interface{}{
+		"Groups": groups,
+	}); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		return
+	}
+}
+
+// Helper function to format vote counts
+func formatVotes(votes int) string {
+	if votes == 0 {
+		return "NA"
+	}
+	return fmt.Sprintf("%d", votes)
+}
+
+func (h *CountyHandler) HandleGetCandidatesHTML(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get county ID from path
+	countyID := r.PathValue("id")
+	if countyID == "" {
+		http.Error(w, "County ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get results from PocketBase
+	collectionName := fmt.Sprintf("county_%s_results", countyID)
+	collection, err := h.store.GetPocketBase().Dao().FindCollectionByNameOrId(collectionName)
+	if err != nil {
+		http.Error(w, "County results not found", http.StatusNotFound)
+		return
+	}
+
+	// Query only candidate results
+	query := h.store.GetPocketBase().Dao().RecordQuery(collection).
+		AndWhere(dbx.HashExp{"type": "candidate"})
+
+	// Initialize slice to hold all records
+	var allRecords []*pb.Record
+
+	// Get all records with pagination
+	page := 1
+	for {
+		pageRecords := []*pb.Record{}
+		err := query.Offset(int64((page - 1) * perPage)).
+			Limit(int64(perPage)).
+			All(&pageRecords)
+
+		if err != nil {
+			log.Printf("Error fetching page %d: %v", page, err)
+			http.Error(w, "Error fetching results", http.StatusInternalServerError)
+			return
+		}
+
+		// If no records returned, we've reached the end
+		if len(pageRecords) == 0 {
+			break
+		}
+
+		allRecords = append(allRecords, pageRecords...)
+		page++
+	}
+
+	// Group candidates by race (using all records)
+	raceMap := make(map[string]*Race)
+	for _, record := range allRecords {
+		contestName := record.GetString("contest_name")
+		if _, exists := raceMap[contestName]; !exists {
+			raceMap[contestName] = &Race{
+				Title: contestName,
+			}
+		}
+
+		candidate := Candidate{
+			Name:     record.GetString("choice_name"),
+			Position: record.GetString("description"),
+			Votes:    formatVotes(record.GetInt("votes")),
+		}
+		raceMap[contestName].Candidates = append(raceMap[contestName].Candidates, candidate)
+	}
+
+	// Convert map to slice
+	var races []Race
+	for _, race := range raceMap {
+		races = append(races, *race)
+	}
+
+	// Parse and execute template
+	tmpl, err := template.ParseFiles("internal/templates/candidates.html")
+	if err != nil {
+		log.Printf("Error parsing template: %v", err)
+		http.Error(w, "Error parsing template", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if err := tmpl.Execute(w, map[string]interface{}{
+		"Races": races,
+	}); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		return
+	}
 } 

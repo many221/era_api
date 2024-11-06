@@ -56,6 +56,8 @@ func main() {
 	mux.HandleFunc("POST /api/bulk-parse/{method}", countyHandler.HandleBulkParseByMethod)
 	mux.HandleFunc("POST /api/cleanup", countyHandler.HandleCleanupCollections)
 	mux.HandleFunc("GET /api/county-results/{id}", countyHandler.HandleGetCountyResults)
+	mux.HandleFunc("GET /api/county-measures/{id}", countyHandler.HandleGetMeasuresHTML)
+	mux.HandleFunc("GET /api/county-candidates/{id}", countyHandler.HandleGetCandidatesHTML)
 
 	// Add health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

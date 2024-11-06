@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .race-box {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .race-title {
+            background-color: #1a3668;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+        .candidate {
+            border-top: 1px solid #ddd;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .candidate:nth-child(even) {
+            background-color: #f8f8f8;
+        }
+        .name {
+            color: #738c3f;
+            font-weight: bold;
+        }
+        .position {
+            font-style: italic;
+            color: #555;
+            font-size: 0.9em;
+        }
+        .votes {
+            color: #9e0000;
+            font-weight: bold;
+            min-width: 70px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    {{range .Races}}
+    <div class="race-box">
+        <div class="race-title">{{.Title}}</div>
+        {{range .Candidates}}
+        <div class="candidate">
+            <div>
+                <span class="name">{{.Name}}</span>
+                {{if .Position}}<br><span class="position">{{.Position}}</span>{{end}}
+            </div>
+            <div class="votes">{{.Votes}}</div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+</body>
+</html> 

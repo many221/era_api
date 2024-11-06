@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .race-box {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .race-title {
+            background-color: #1a3668;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+        .candidate {
+            border-top: 1px solid #ddd;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        .candidate:nth-child(even) {
+            background-color: #f8f8f8;
+        }
+        .candidate > div:first-child {
+            flex: 1;
+        }
+        .name {
+            color: #738c3f;
+            font-weight: bold;
+        }
+        .position {
+            font-style: italic;
+            color: #555;
+            font-size: 0.9em;
+            margin-top: 5px;
+            display: block;
+        }
+        .votes {
+            min-width: 200px;
+            text-align: center;
+            display: flex;
+            justify-content: flex-end;
+            gap: 30px;
+        }
+        .vote-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 60px;
+        }
+        .vote-label {
+            font-weight: bold;
+            color: #9e0000;
+            margin-bottom: 5px;
+        }
+        .vote-number {
+            color: #738c3f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    {{range .Groups}}
+    <div class="race-box">
+        <div class="race-title">{{.Title}}</div>
+        {{range .Measures}}
+        <div class="candidate">
+            <div>
+                <span class="name">{{.Name}}</span><br>
+                <span class="position" style="white-space: pre-wrap;">{{.Description}}</span>
+            </div>
+            <div class="votes">
+                <div class="vote-column">
+                    <div class="vote-label">YES</div>
+                    <div class="vote-number">{{.YesVotes}}</div>
+                </div>
+                <div class="vote-column">
+                    <div class="vote-label">NO</div>
+                    <div class="vote-number">{{.NoVotes}}</div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+</body>
+</html> 
