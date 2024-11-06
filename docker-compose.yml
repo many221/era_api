@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+      - "8090:8090"
+    volumes:
+      - pb_data:/app/pb_data
+    restart: unless-stopped
+
+volumes:
+  pb_data: 
