@@ -19,8 +19,8 @@ func NewPocketBaseStore(dataDir string) (*PocketBaseStore, error) {
     // Create a new PocketBase instance with a data directory
     app := pocketbase.New()
     
-    // Configure the root command
-    app.RootCmd.SetArgs([]string{"serve", "--dir", dataDir, "--http", "127.0.0.1:8090"})
+    // Configure the root command - change from 127.0.0.1 to 0.0.0.0 to allow external access
+    app.RootCmd.SetArgs([]string{"serve", "--dir", dataDir, "--http", "0.0.0.0:8090"})
     
     // Start PocketBase in a goroutine
     go func() {
