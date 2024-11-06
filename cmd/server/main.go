@@ -38,7 +38,6 @@ func main() {
 	mux.HandleFunc("POST /api/county-links/{id}/parse", countyHandler.HandleParseCountyLink)
 	mux.HandleFunc("POST /api/bulk-parse/{method}", countyHandler.HandleBulkParseByMethod)
 	mux.HandleFunc("POST /api/cleanup", countyHandler.HandleCleanupCollections)
-	mux.HandleFunc("GET /api/county-results/{id}", countyHandler.HandleGetCountyResults)
 
 	// Start server
 	log.Println("Server starting on :8080...")
