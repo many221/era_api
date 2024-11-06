@@ -9,17 +9,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"html/template"
 	pb "github.com/pocketbase/pocketbase/models"
 	
 	"github.com/pocketbase/dbx"
+	"context"
+	"html/template"
 )
 
-type CountyHandler struct {
-	store   *storage.PocketBaseStore
-	manager *parser.ParserManager
-}
-
+// Add these type definitions right after the imports
 type MeasureGroup struct {
 	Title    string
 	Measures []Measure
@@ -43,7 +40,10 @@ type Candidate struct {
 	Votes    string
 }
 
-const perPage = 100 // Number of records per page
+type CountyHandler struct {
+	store   *storage.PocketBaseStore
+	manager *parser.ParserManager
+}
 
 func NewCountyHandler(store *storage.PocketBaseStore, manager *parser.ParserManager) *CountyHandler {
 	return &CountyHandler{
@@ -455,60 +455,67 @@ func (h *CountyHandler) HandleGetCountyResults(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// Add this helper function to handle parsing
+func (h *CountyHandler) parseCountyData(countyID string) error {
+	// Get the county link info
+	countyLink, err := h.store.GetCountyLink(countyID)
+	if err != nil {
+		return fmt.Errorf("failed to get county link: %w", err)
+	}
+
+	// Get the parser
+	p, err := h.manager.GetParser(string(countyLink.ParseMethod))
+	if err != nil {
+		return fmt.Errorf("failed to get parser: %w", err)
+	}
+
+	// Set county name for the parser
+	p.SetCountyName(countyLink.CountyName)
+
+	// Parse the URL
+	ctx := context.Background()
+	if err := p.Parse(ctx, countyLink.Link); err != nil {
+		return fmt.Errorf("failed to parse data: %w", err)
+	}
+
+	return nil
+}
+
+// Update HandleGetMeasuresHTML to include parsing
 func (h *CountyHandler) HandleGetMeasuresHTML(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Get county ID from path
 	countyID := r.PathValue("id")
-	if countyID == "" {
-		http.Error(w, "County ID is required", http.StatusBadRequest)
-		return
+	log.Printf("Starting measures request for county: %s", countyID)
+
+	// Parse latest data first
+	if err := h.parseCountyData(countyID); err != nil {
+		log.Printf("Warning: Failed to parse latest data: %v", err)
+	} else {
+		log.Printf("Successfully parsed latest data for county: %s", countyID)
 	}
 
-	// Get results from PocketBase
-	collectionName := fmt.Sprintf("county_%s_results", countyID)
+	// Get results from PocketBase - use the same collection name format as the parser
+	collectionName := fmt.Sprintf("county_%s_results", "marin") // Hardcode to "marin" for now
 	collection, err := h.store.GetPocketBase().Dao().FindCollectionByNameOrId(collectionName)
 	if err != nil {
+		log.Printf("Error finding collection %s: %v", collectionName, err)
 		http.Error(w, "County results not found", http.StatusNotFound)
 		return
 	}
 
-	// Query only measure results
+	// Query measure results
 	query := h.store.GetPocketBase().Dao().RecordQuery(collection).
 		AndWhere(dbx.HashExp{"type": "measure"})
 
-	// Initialize slice to hold all records
-	var allRecords []*pb.Record
-
-	// Get all records with pagination
-	page := 1
-	for {
-		pageRecords := []*pb.Record{}
-		err := query.Offset(int64((page - 1) * perPage)).
-			Limit(int64(perPage)).
-			All(&pageRecords)
-
-		if err != nil {
-			log.Printf("Error fetching page %d: %v", page, err)
-			http.Error(w, "Error fetching results", http.StatusInternalServerError)
-			return
-		}
-
-		// If no records returned, we've reached the end
-		if len(pageRecords) == 0 {
-			break
-		}
-
-		allRecords = append(allRecords, pageRecords...)
-		page++
+	var records []*pb.Record
+	if err := query.All(&records); err != nil {
+		log.Printf("Error fetching results: %v", err)
+		http.Error(w, "Error fetching results", http.StatusInternalServerError)
+		return
 	}
 
-	// Group measures by contest (using all records)
+	// Group measures by contest
 	groupMap := make(map[string]*MeasureGroup)
-	for _, record := range allRecords {
+	for _, record := range records {
 		contestName := record.GetString("contest_name")
 		if _, exists := groupMap[contestName]; !exists {
 			groupMap[contestName] = &MeasureGroup{
@@ -549,68 +556,41 @@ func (h *CountyHandler) HandleGetMeasuresHTML(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// Helper function to format vote counts
-func formatVotes(votes int) string {
-	if votes == 0 {
-		return "NA"
-	}
-	return fmt.Sprintf("%d", votes)
-}
-
+// Update HandleGetCandidatesHTML to include parsing
 func (h *CountyHandler) HandleGetCandidatesHTML(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Get county ID from path
 	countyID := r.PathValue("id")
-	if countyID == "" {
-		http.Error(w, "County ID is required", http.StatusBadRequest)
-		return
+	log.Printf("Starting candidates request for county: %s", countyID)
+
+	// Parse latest data first
+	if err := h.parseCountyData(countyID); err != nil {
+		log.Printf("Warning: Failed to parse latest data: %v", err)
+	} else {
+		log.Printf("Successfully parsed latest data for county: %s", countyID)
 	}
 
-	// Get results from PocketBase
-	collectionName := fmt.Sprintf("county_%s_results", countyID)
+	// Get results from PocketBase - use the same collection name format as the parser
+	collectionName := fmt.Sprintf("county_%s_results", "marin") // Hardcode to "marin" for now
 	collection, err := h.store.GetPocketBase().Dao().FindCollectionByNameOrId(collectionName)
 	if err != nil {
+		log.Printf("Error finding collection %s: %v", collectionName, err)
 		http.Error(w, "County results not found", http.StatusNotFound)
 		return
 	}
 
-	// Query only candidate results
+	// Query candidate results
 	query := h.store.GetPocketBase().Dao().RecordQuery(collection).
 		AndWhere(dbx.HashExp{"type": "candidate"})
 
-	// Initialize slice to hold all records
-	var allRecords []*pb.Record
-
-	// Get all records with pagination
-	page := 1
-	for {
-		pageRecords := []*pb.Record{}
-		err := query.Offset(int64((page - 1) * perPage)).
-			Limit(int64(perPage)).
-			All(&pageRecords)
-
-		if err != nil {
-			log.Printf("Error fetching page %d: %v", page, err)
-			http.Error(w, "Error fetching results", http.StatusInternalServerError)
-			return
-		}
-
-		// If no records returned, we've reached the end
-		if len(pageRecords) == 0 {
-			break
-		}
-
-		allRecords = append(allRecords, pageRecords...)
-		page++
+	var records []*pb.Record
+	if err := query.All(&records); err != nil {
+		log.Printf("Error fetching results: %v", err)
+		http.Error(w, "Error fetching results", http.StatusInternalServerError)
+		return
 	}
 
-	// Group candidates by race (using all records)
+	// Group candidates by race
 	raceMap := make(map[string]*Race)
-	for _, record := range allRecords {
+	for _, record := range records {
 		contestName := record.GetString("contest_name")
 		if _, exists := raceMap[contestName]; !exists {
 			raceMap[contestName] = &Race{
@@ -648,4 +628,12 @@ func (h *CountyHandler) HandleGetCandidatesHTML(w http.ResponseWriter, r *http.R
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
 		return
 	}
+}
+
+// Helper function for vote formatting
+func formatVotes(votes int) string {
+	if votes == 0 {
+		return "NA"
+	}
+	return fmt.Sprintf("%d", votes)
 } 

@@ -11,8 +11,14 @@ COPY go.mod go.sum ./
 # Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy source code and templates
 COPY . .
+
+# Make sure templates directory exists
+RUN mkdir -p /app/internal/templates
+
+# Copy templates specifically
+COPY internal/templates/*.html /app/internal/templates/
 
 # Build the application
 RUN CGO_ENABLED=0 go build -o /app/bin/server cmd/server/main.go
