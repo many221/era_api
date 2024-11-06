@@ -6,29 +6,46 @@ import (
 	"era/internal/storage"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
-	// Initialize PocketBase store
-	store, err := storage.NewPocketBaseStore()
+	// Get environment variables with defaults
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "./pb_data"
+	}
+
+	// Ensure data directory exists
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		log.Fatal("Failed to create data directory:", err)
+	}
+
+	// Initialize PocketBase store with data directory
+	store, err := storage.NewPocketBaseStore(dataDir)
 	if err != nil {
 		log.Fatal("Failed to initialize storage:", err)
 	}
 
-	// Initialize parser manager with PocketBase instance
+	// Initialize parser manager
 	manager, err := parser.NewParserManager(store.GetPocketBase())
 	if err != nil {
 		log.Fatal("Failed to initialize parser manager:", err)
 	}
 	defer manager.Cleanup()
 
-	// Initialize handler with both store and parser manager
+	// Initialize handler
 	countyHandler := handlers.NewCountyHandler(store, manager)
 
-	// Create new mux router (Go 1.22+)
+	// Create mux router
 	mux := http.NewServeMux()
 
-	// Register all routes
+	// Register routes
 	mux.HandleFunc("POST /api/county-links", countyHandler.HandleSaveCountyLink)
 	mux.HandleFunc("POST /api/county-links/bulk", countyHandler.HandleBulkSaveCountyLinks)
 	mux.HandleFunc("GET /api/county-links/{id...}", countyHandler.HandleGetCountyLink)
@@ -38,10 +55,17 @@ func main() {
 	mux.HandleFunc("POST /api/county-links/{id}/parse", countyHandler.HandleParseCountyLink)
 	mux.HandleFunc("POST /api/bulk-parse/{method}", countyHandler.HandleBulkParseByMethod)
 	mux.HandleFunc("POST /api/cleanup", countyHandler.HandleCleanupCollections)
+	mux.HandleFunc("GET /api/county-results/{id}", countyHandler.HandleGetCountyResults)
+
+	// Add health check endpoint
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
 	// Start server
-	log.Println("Server starting on :8080...")
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	log.Printf("Server starting on :%s...", port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
 	}
 } 

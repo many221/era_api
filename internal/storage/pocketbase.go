@@ -15,16 +15,10 @@ type PocketBaseStore struct {
     app *pocketbase.PocketBase
 }
 
-func NewPocketBaseStore() (*PocketBaseStore, error) {
+func NewPocketBaseStore(dataDir string) (*PocketBaseStore, error) {
     // Create a new PocketBase instance with a data directory
     app := pocketbase.New()
     
-    // Set data directory and other flags
-    dataDir := "./pb_data"
-    if err := os.MkdirAll(dataDir, 0755); err != nil {
-        return nil, fmt.Errorf("failed to create data directory: %w", err)
-    }
-
     // Configure the root command
     app.RootCmd.SetArgs([]string{"serve", "--dir", dataDir, "--http", "127.0.0.1:8090"})
     
