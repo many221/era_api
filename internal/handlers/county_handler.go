@@ -88,6 +88,13 @@ func filter(results []Result, fn func(Result) bool) []Result {
 	return filtered
 }
 
+// Add this helper function at the top with other helper functions
+func enableCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
+}
+
 // County Link Management Handlers
 func (h *CountyHandler) HandleSaveCountyLink(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -767,6 +774,15 @@ func (h *CountyHandler) parseCountyData(countyID string) error {
 
 // Add this new handler
 func (h *CountyHandler) HandleParseAndFormat(w http.ResponseWriter, r *http.Request) {
+	// Handle preflight OPTIONS request
+	if r.Method == http.MethodOptions {
+		enableCORS(w)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	enableCORS(w)  // Enable CORS for all other requests
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
