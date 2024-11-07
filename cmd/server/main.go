@@ -46,12 +46,31 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Register routes
-	mux.HandleFunc("/api/county-links", countyHandler.HandleSaveCountyLink)
+	mux.HandleFunc("/api/county-links", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			countyHandler.HandleGetCountyLink(w, r)
+		case http.MethodPost:
+			countyHandler.HandleSaveCountyLink(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/api/county-links/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			countyHandler.HandleGetCountyLink(w, r)
+		case http.MethodPut:
+			countyHandler.HandleUpdateCountyLink(w, r)
+		case http.MethodDelete:
+			countyHandler.HandleDeleteCountyLink(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	mux.HandleFunc("/api/county-links/bulk", countyHandler.HandleBulkSaveCountyLinks)
-	mux.HandleFunc("/api/county-links/{id...}", countyHandler.HandleGetCountyLink)
-	mux.HandleFunc("/api/county-links", countyHandler.HandleGetCountyLink)
-	mux.HandleFunc("/api/county-links/{id}", countyHandler.HandleUpdateCountyLink)
-	mux.HandleFunc("/api/county-links/{id}", countyHandler.HandleDeleteCountyLink)
 	mux.HandleFunc("/api/county-links/{id}/parse", countyHandler.HandleParseCountyLink)
 	mux.HandleFunc("/api/bulk-parse/{method}", countyHandler.HandleBulkParseByMethod)
 	mux.HandleFunc("/api/cleanup", countyHandler.HandleCleanupCollections)
