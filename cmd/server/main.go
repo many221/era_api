@@ -58,6 +58,9 @@ func main() {
 	mux.HandleFunc("GET /api/county-results/{id}", countyHandler.HandleGetCountyResults)
 	mux.HandleFunc("GET /api/county-measures/{id}", countyHandler.HandleGetMeasuresHTML)
 	mux.HandleFunc("GET /api/county-candidates/{id}", countyHandler.HandleGetCandidatesHTML)
+	mux.HandleFunc("POST /api/parse", countyHandler.HandleDirectParse)
+	mux.HandleFunc("POST /api/parse/bulk", countyHandler.HandleDirectBulkParse)
+	mux.HandleFunc("POST /api/parse-and-format", countyHandler.HandleParseAndFormat)
 
 	// Add health check endpoint
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
