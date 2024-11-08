@@ -89,8 +89,24 @@ func filter(results []Result, fn func(Result) bool) []Result {
 }
 
 // Add this helper function at the top with other helper functions
-func enableCORS(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+func enableCORS(w http.ResponseWriter, r *http.Request) {
+	// Allow both localhost and deployed frontend
+	origins := []string{
+		"http://localhost:5173",
+		"https://era-fe-sparkling-sun-7787.fly.dev",
+	}
+	
+	// Get the origin from the request header
+	origin := r.Header.Get("Origin")
+	
+	// Check if the origin is allowed
+	for _, allowedOrigin := range origins {
+		if origin == allowedOrigin {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			break
+		}
+	}
+	
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
 }
@@ -776,12 +792,12 @@ func (h *CountyHandler) parseCountyData(countyID string) error {
 func (h *CountyHandler) HandleParseAndFormat(w http.ResponseWriter, r *http.Request) {
 	// Handle preflight OPTIONS request
 	if r.Method == http.MethodOptions {
-		enableCORS(w)
+		enableCORS(w, r)  // Pass the request to enableCORS
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	enableCORS(w)  // Enable CORS for all other requests
+	enableCORS(w, r)  // Pass the request to enableCORS for all other requests
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
